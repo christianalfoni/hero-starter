@@ -245,11 +245,21 @@ helpers.findNearestEnemy = function(gameData) {
 helpers.findNearestTeamMember = function(gameData) {
   var hero = gameData.activeHero;
   var board = gameData.board;
+  var data = null;
 
   //Get the path info object
   var pathInfoObject = helpers.findNearestObjectDirectionAndDistance(board, hero, function(heroTile) {
-    return heroTile.type === 'Hero' && heroTile.team === hero.team;
+    if (heroTile.type === 'Hero' && heroTile.team === hero.team) {
+      data = heroTile;
+      return true;
+    }
   });
+
+  if (data) {
+    Object.keys(data).forEach(function (key) {
+      pathInfoObject[key] = data[key];
+    });
+  }
 
   //Return the direction that needs to be taken to achieve the goal
   return pathInfoObject;
@@ -261,8 +271,9 @@ helpers.moveAwayFromAndTowards = function (gameData, enemy, target) {
   var allowedDirections = ["North", "East", "South", "West"];
   allowedDirections.splice(allowedDirections.indexOf(enemy.direction), 1);
 
-  var heroTop = hero.coords[0];
-  var heroLeft = hero.coords[1];
+
+  var heroTop = hero.distanceFromTop;
+  var heroLeft = hero.distanceFromLeft;
   var northTile = board.tiles[heroTop + 1] ? board.tiles[heroTop + 1][heroLeft] : null;
   var eastTile = board.tiles[heroTop][heroLeft + 1];
   var southTile = board.tiles[heroTop - 1] ? board.tiles[heroTop - 1][heroLeft] : null;
@@ -286,6 +297,35 @@ helpers.moveAwayFromAndTowards = function (gameData, enemy, target) {
   return pathInfoObject;
 };
 
+helpers.oneEnemyThatICanTake = function (gameData, nearestEnemy) {
+  var hero = gameData.activeHero;
+  var board = gameData.board;
+  var enemies = 0;
+
+  var heroTop = hero.distanceFromTop;
+  var heroLeft = hero.distanceFromLeft;
+  var northTile = board.tiles[heroTop + 1] ? board.tiles[heroTop + 1][heroLeft] : null;
+  var eastTile = board.tiles[heroTop][heroLeft + 1];
+  var southTile = board.tiles[heroTop - 1] ? board.tiles[heroTop - 1][heroLeft] : null;
+  var westTile = board.tiles[heroTop][heroLeft - 1];
+
+  if (northTile && northTile.type === 'Hero' && northTile.team !== hero.team) {
+    enemies++;
+  }
+  if (eastTile && eastTile.type === 'Hero' && eastTile.team !== hero.team) {
+    enemies++;
+  }
+  if (southTile && southTile.type === 'Hero' && southTile.team !== hero.team) {
+    enemies++;
+  }
+  if (westTile && westTile.type === 'Hero' && westTile.team !== hero.team) {
+    enemies++;
+  }
+  console.log('Can I take one?', enemies, nearestEnemy.health, hero.health);
+  return enemies === 1 && nearestEnemy.health <= hero.health;
+
+};
+
 var move = function (gameData) {
   var myHero = gameData.activeHero;
 
@@ -300,18 +340,43 @@ var move = function (gameData) {
   var nearestMine = (function () {
     var nonTeam = helpers.findNearestNonTeamDiamondMine(gameData);
     var unOwned = helpers.findNearestUnownedDiamondMine(gameData);
-    return nonTeam.distance <= unOwned ? nonTeam : unOwned;
+    return nonTeam.distance <= unOwned.distance ? nonTeam : unOwned;
   }());
+
+
+  /*
+      BARBARIAN HEALER MINER
+   */
+
+  if (myHero.health === 100 || helpers.oneEnemyThatICanTake(gameData, nearestEnemy)) {
+    console.log('blooood!');
+    return nearestEnemy.direction;
+  }
+
+  if (myHero.health <= 80 && nearestTeamMember.distance === 1 && nearestTeamMember.health < 60) {
+    return nearestTeamMember.direction;
+  }
+
+  if (myHero.health === 100 && nearestMine.distance === 1) {
+    return nearestMine.direction;
+  }
+
 
   /*
       LOW ON HEALTH
    */
-  if (myHero.health <= 40) {
+  if (nearestHealth.distance === 1 && myHero.health < 100) {
+    return nearestHealth.direction;
+  }
 
-    if (nearestEnemy.distance < 3) {
+  if (myHero.health <= 60) {
+
+    if (nearestEnemy.distance < 5) {
       var healthWell = helpers.moveAwayFromAndTowards(gameData, nearestEnemy, 'HealthWell');
-      return healthWell.direction;
+      console.log('enemy near, moving to health well or team member');
+      return healthWell && healthWell.distance < nearestTeamMember.distance ? healthWell.direction : nearestHealth.distance === 1 ? nearestHealth.direction : nearestTeamMember.distance === 1 ? nearestEnemy.direction : nearestTeamMember.direction;
     } else {
+      console.log('moving to nearest health');
       return nearestHealth.direction;
     }
 
@@ -319,6 +384,7 @@ var move = function (gameData) {
 
   if (myHero.health < 100 && nearestHealth.distance === 1) {
     //Heal if you aren't full health and are close to a health well already
+    console.log('healing myself');
     return nearestHealth.direction;
   }
 
@@ -326,6 +392,7 @@ var move = function (gameData) {
       REGROUP
    */
   if (nearestTeamMember && nearestTeamMember.distance > 3) {
+    console.log('regrouping');
     return nearestTeamMember.direction;
   }
 
@@ -333,6 +400,7 @@ var move = function (gameData) {
       HEAL TEAM MEMBER
    */
   if (nearestTeamMember && nearestTeamMember.distance === 1 && nearestTeamMember.health <= 60) {
+    console.log('healing team member');
     return nearestTeamMember.direction;
   }
 
@@ -340,13 +408,15 @@ var move = function (gameData) {
       ATTACK
    */
   if (nearestEnemy && nearestEnemy.distance === 1) {
+    console.log('attacking');
     return nearestEnemy.direction;
   }
 
   /*
       MINE
    */
-  if (nearestMine && nearestMine.distance <= 3) {
+  if (myHero.health > 60 && nearestMine && nearestMine.distance <= 3) {
+    console.log('mining');
     return nearestMine.direction;
   }
 
