@@ -304,23 +304,26 @@ helpers.oneEnemyThatICanTake = function (gameData, nearestEnemy) {
 
   var heroTop = hero.distanceFromTop;
   var heroLeft = hero.distanceFromLeft;
-  var northTile = board.tiles[heroTop + 1] ? board.tiles[heroTop + 1][heroLeft] : null;
-  var eastTile = board.tiles[heroTop][heroLeft + 1];
-  var southTile = board.tiles[heroTop - 1] ? board.tiles[heroTop - 1][heroLeft] : null;
-  var westTile = board.tiles[heroTop][heroLeft - 1];
+  for (var x = 1; x < 5; x++) {
+    var northTile = board.tiles[heroTop + x] ? board.tiles[heroTop + x][heroLeft] : null;
+    var eastTile = board.tiles[heroTop][heroLeft + x];
+    var southTile = board.tiles[heroTop - x] ? board.tiles[heroTop - x][heroLeft] : null;
+    var westTile = board.tiles[heroTop][heroLeft - x];
 
-  if (northTile && northTile.type === 'Hero' && northTile.team !== hero.team) {
-    enemies++;
+    if (northTile && northTile.type === 'Hero' && northTile.team !== hero.team) {
+      enemies++;
+    }
+    if (eastTile && eastTile.type === 'Hero' && eastTile.team !== hero.team) {
+      enemies++;
+    }
+    if (southTile && southTile.type === 'Hero' && southTile.team !== hero.team) {
+      enemies++;
+    }
+    if (westTile && westTile.type === 'Hero' && westTile.team !== hero.team) {
+      enemies++;
+    }
   }
-  if (eastTile && eastTile.type === 'Hero' && eastTile.team !== hero.team) {
-    enemies++;
-  }
-  if (southTile && southTile.type === 'Hero' && southTile.team !== hero.team) {
-    enemies++;
-  }
-  if (westTile && westTile.type === 'Hero' && westTile.team !== hero.team) {
-    enemies++;
-  }
+
   console.log('Can I take one?', enemies, nearestEnemy.health, hero.health);
   return enemies === 1 && nearestEnemy.health <= hero.health;
 
@@ -348,13 +351,14 @@ var move = function (gameData) {
       BARBARIAN HEALER MINER
    */
 
+
+  if (myHero.health >= 80 && nearestTeamMember.distance === 1 && nearestTeamMember.health < 60) {
+    return nearestTeamMember.direction;
+  }
+
   if (myHero.health === 100 || helpers.oneEnemyThatICanTake(gameData, nearestEnemy)) {
     console.log('blooood!');
     return nearestEnemy.direction;
-  }
-
-  if (myHero.health <= 80 && nearestTeamMember.distance === 1 && nearestTeamMember.health < 60) {
-    return nearestTeamMember.direction;
   }
 
   if (myHero.health === 100 && nearestMine.distance === 1) {
@@ -365,7 +369,7 @@ var move = function (gameData) {
   /*
       LOW ON HEALTH
    */
-  if (nearestHealth.distance === 1 && myHero.health < 100) {
+  if (nearestHealth.distance < 3 && myHero.health < 80) {
     return nearestHealth.direction;
   }
 
@@ -374,7 +378,7 @@ var move = function (gameData) {
     if (nearestEnemy.distance < 5) {
       var healthWell = helpers.moveAwayFromAndTowards(gameData, nearestEnemy, 'HealthWell');
       console.log('enemy near, moving to health well or team member');
-      return healthWell && healthWell.distance < nearestTeamMember.distance ? healthWell.direction : nearestHealth.distance === 1 ? nearestHealth.direction : nearestTeamMember.distance === 1 ? nearestEnemy.direction : nearestTeamMember.direction;
+      return healthWell && healthWell.distance < nearestTeamMember.distance ? healthWell.direction : nearestTeamMember.distance === 1 ? nearestEnemy.direction : nearestTeamMember.direction;
     } else {
       console.log('moving to nearest health');
       return nearestHealth.direction;
